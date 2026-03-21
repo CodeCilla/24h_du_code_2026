@@ -15,7 +15,7 @@ from nano8_emulator import Nano8Emulator
 import buzzer
 
 # ─── Nom BLE de votre équipe ───────────────────────────────────────────────────
-robotName = 'myTeamName'  # ← remplacer par le nom de votre équipe
+robotName = 'Ekod&Commit'  # ← remplacer par le nom de votre équipe
 
 # ─── Variables globales ────────────────────────────────────────────────────────
 alphabot = oled = vl53l0x = None
