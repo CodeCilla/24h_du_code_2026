@@ -41,11 +41,12 @@ _loop:
     ; Vérifier si le nouveau b (R1) a dépassé 255
     ; Si R1 < R0 alors overflow (signe d'un dépassement 8 bits)
     CMP R1 R0        ; comparer nouveau b avec a
-    JLT _end         ; si b < a : overflow, on arrête
+    JLT _print_and_end ; si b < a : on affiche `a` final puis on arrête
 
     JMP _loop        ; continuer
 
-_end:
+_print_and_end:
+    OUT R0           ; afficher le dernier terme (ex: 233)
     RET              ; pile vide → arrêt du programme
 
 ; --- Fonction : additionne R0 dans R1 (R1 += R0) ---

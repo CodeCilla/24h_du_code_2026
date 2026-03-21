@@ -5,9 +5,9 @@ Lit un fichier .bin et simule l'exécution instruction par instruction.
 Produit un rapport JSON avec état registres, stack, cycles à chaque étape.
 
 Usage:
-  python3 simulator.py programme.bin             # affiche rapport JSON
-  python3 simulator.py programme.bin --html      # ouvre interface web
-  python3 simulator.py programme.bin -o rapport.json
+    python3 simulator.py programme.bin             # affiche rapport JSON
+    python3 simulator.py programme.bin --html      # ouvre interface web
+    python3 simulator.py programme.bin -o rapport.json
 """
 
 import sys
