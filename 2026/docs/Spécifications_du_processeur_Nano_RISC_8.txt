@@ -1,0 +1,132 @@
+Spécifications du processeur Nano RISC 8
+
+Le bus de donnée fait 8 bits.
+Il y a 4 registres de travail 8 bits.
+Le bus d'adresse fait 8 bits.
+La RAM fait 256 octets.
+Les instructions et leurs paramètres sont toutes codées sur 1 ou 2 octets.
+Les instructions sur 1 octet prennent 1 cycle d'horloge.
+Les instructions sur 2 octets prennent 2 cycles d'horloge.
+Sauf  LDR et STR qui prennent chacune 3 cycles d'horloge.
+Le programme démarre à l'adresse PC=0 et s’incrémente pour lire les
+instructions suivantes.
+la pile démarre vide à l'adresse SP=255 et se décrémente après avoir déposé
+une valeur.
+Si la pile qui monte rejoint le programme qui descend, c'est la catastrophe,
+charge au programmeurs que cela n'arrive pas.
+
+
+Interface de programmation
+
+Les instructions sont en MAJUSCULES.
+Pas plus d'une instruction et ses paramètres par ligne.
+Les registres, tous en MAJUSCULES, sont R0, R1, R2 et R3.
+Les valeurs sont en décimales [0..255] ou en ASCII ['a'..'z'+'A'..'Z'
++'0'..'9'].
+Les labels commencent par _ et sont en minuscules et décimales.
+Chaque étiquette (emplacement pour sauter dans le code) est un label suivit
+par:
+Pas plus d'une étiquette par ligne.
+Pas de mélange étiquette et instruction sur la même ligne.
+Chaque paramètre est séparé par un espace.
+Chaque tabulation vaut un espace.
+Plusieurs espaces consécutifs valent un espace.
+Les espaces, avant et après l'instruction et ses paramètres, ne valent rien.
+Les commentaires commencent par un point-virgule et finissent en fin de ligne.
+
+
+_label_123:		;étiquette, adresse dans le code en fonction des instructions
+			;précédentes.
+
+DB valeur		;valeur[0..255]['a'..'z'+'A'..'Z'+'0'..'9'] génération binaire
+			;bbbbbbbb
+			;définit la valeur d'un octet décimal ou ASCII
+
+CALL _label		;adresse[0..255] génération binaire 00000000 aaaaaaaa
+			;empile l'adresse de retour puis appel de la fonction en
+			;aaaaaaaa
+
+RET			;génération binaire 10000000
+			;si la pile est vide, arrêt du programme.
+			;sinon dépile l’adresse de retour puis saute à cette adresse
+
+JMP _label		;génération binaire 01000000 aaaaaaaa
+			;saut à l'adresse aaaaaaaa
+
+JLT _label		;génération binaire 11000000 aaaaaaaa
+			;saut conditionnel (flag LT=1) à l'adresse aaaaaaaa
+
+JEQ _label		;génération binaire 00100000 aaaaaaaa
+			;saut conditionnel (flag EQ=1) à l'adresse aaaaaaaa
+					
+PUSH Rx		;génération binaire 101000xx avec xx = R0, R1,R2,R3
+			;met la valeur du registre dans la pile, décrémente l'adresse
+			;de la pile
+
+POP Rx		;génération binaire 011000xx avec xx = R0, R1,R2,R3
+			;incrémente l'adresse de la pile, lit la valeur du registre
+			;depuis la pile
+
+MOV Rx valeur	;génération binaire 111000xx vvvvvvvv  avec xx = R0,R1,R2,R3
+			;met dans le registre xx la valeur  vvvvvvvv
+
+SUB Rx valeur	;génération binaire 000100xx vvvvvvvv  avec xx = R0,R1,R2,R3
+			;soustrait du registre xx la valeur  vvvvvvvv
+
+CMP Rx value	;génération binaire 100100xx vvvvvvvv  avec xx = R0,R1,R2,R3
+			;compare le registre xx à la valeur  vvvvvvvv, modifie les
+			;flags LT et EQ
+			;LT= (Rx<valeur), EQ=(Rx==valeur)
+
+MOV Rx Ry		;génération binaire 0101xxyy  avec xx et yy = R0,R1,R2,R3
+			;met dans le registre xx la valeur du registre yy
+
+SUB Rx Ry		;génération binaire 1101xxyy  avec xx et yy = R0,R1,R2,R3
+			;soustrait du registre xx la valeur du registre yy
+
+CMP Rx Ry		;génération binaire 0011xxyy  avec xx et yy = R0,R1,R2,R3
+			;compare le registre xx à la valeur du registre yy, modifie
+			;les flags LT et EQ
+			;LT= (Rx<Ry), EQ=(Rx==Ry)
+
+LDR Rx Ry _label	;génération binaire 1011xxyy aaaaaaaa  avec xx et
+			;yy = R0,R1,R2,R3
+			;load dans le registre xx la valeur à l'adresse aaaaaaaa+Ry
+
+STR Rx Ry _label	;génération binaire 0111xxyy aaaaaaaa  avec xx et
+			;yy = R0,R1,R2,R3
+			;store la valeur dans le registre xx à l'adresse aaaaaaaa+Ry
+
+OUT Rx      ;génération binaire 111100xx avec xx = R0, R1,R2,R3 
+			;met la valeur du registre Rx dans le périphérique de sortie
+            ;dans le cas du robot, le périphérique de sortie est connecté aux
+			; Moteurs les valeurs sont les vitesses svvvsvvv pour moteur
+			; gauche et moteur droit
+            ;svvv vitesse -8..7, gauche et droite
+            ;svvv 4-bits signé en complément à deux
+
+TIM valeur	;génération binaire 11111000 mvvvvvvv 
+			;met dans le registre de Timer la valeur  mvvvvvvv
+            ;le processeur se met en pause pendant multiplicateur*(vvvvvvv+1)
+			; en millisecondes
+            ;vvvvvvv valeur de 0x0 (représente 1) à 0x7F (represente 128)
+            ;m=0 (multiplicateur = 1) ou m=1 (multiplicateur = 100)
+
+
+;exemple de programme avec son binaire de 20 octets représenté en commentaires
+_main:			;adresse 0
+	PUSH R1		;10100001
+	MOV R0 15	;11100000 00001111
+	MOV R1 1	;11100001 00000001
+_loop1:			;adresse 5
+	SUB R0 R1	;11010001
+	CMP R0 0	;10010000 00000000
+	JEQ _loop1_end	;00100000 00001110
+	JMP _loop1	;01000000 00000101
+_data1:			;adresse 12
+	DB	0	;00000000
+	DB	'C'	;01000011
+_loop1_end:		;adresse 14
+	POP R1		;01100001
+	MOV R0 'A'	;11100000 01000001
+	RET		;10000000
