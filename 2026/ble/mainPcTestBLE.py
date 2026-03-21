@@ -13,7 +13,7 @@ import argparse
 import random
 import ComWithDongle
 
-robotName = 'myTeamName'
+robotName = 'EkodEtCommit'
 
 randCharRange = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
