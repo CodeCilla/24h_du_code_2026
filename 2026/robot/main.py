@@ -9,8 +9,9 @@ from stm32_nec import NEC_8, NEC_16
 import neopixel
 import _thread
 import os
-#import bluetooth
-#from stm32_ble_uart import BLEUART
+import bluetooth
+from stm32_ble_uart import BLEUART
+from stlion_vm import StlionVM
 
 import buzzer
 
@@ -411,6 +412,44 @@ def bluetooth_serial_processing(ble_uart):
                 pass
 
 # ----------------------------
+# VM Download Mode
+# ----------------------------
+def vm_download_mode(ble_uart):
+    oled.fill(0)
+    oled.text("VM Mode BLE", 0, 0)
+    oled.text("Waiting BIN...", 0, 16)
+    oled.show()
+    
+    vm_buffer = bytearray()
+    last_rx_time = utime.ticks_ms()
+    receiving = False
+    
+    while True:
+        utime.sleep_ms(50)
+        if ble_uart.any():
+            chunk = ble_uart.read()
+            if chunk:
+                vm_buffer.extend(chunk)
+                last_rx_time = utime.ticks_ms()
+                receiving = True
+                oled.fill(0)
+                oled.text("Receiving...", 0, 0)
+                oled.text(str(len(vm_buffer)) + " bytes", 0, 16)
+                oled.show()
+                
+        if receiving and utime.ticks_diff(utime.ticks_ms(), last_rx_time) > 1000:
+            oled.fill(0)
+            oled.text("Received:", 0, 0)
+            oled.text(str(len(vm_buffer)) + "B", 0, 16)
+            oled.text("Running...", 0, 32)
+            oled.show()
+            utime.sleep(1)
+            
+            vm.load(vm_buffer)
+            vm.run()
+            break
+
+# ----------------------------
 # INIT
 # ----------------------------
 
@@ -447,8 +486,9 @@ except Exception as e:
 
 neopixel_leds = FoursNeoPixel(alphabot.pin_RGB)
 
-#ble = bluetooth.BLE()
-#uart = BLEUART(ble)
+ble = bluetooth.BLE()
+uart = BLEUART(ble)
+vm = StlionVM(oled, neopixel_leds)
 
 ### Print system 
 print()
@@ -490,8 +530,10 @@ while True:
     elif ir_current_remote_code == "play_pause":
         line_follower_simple()
     elif ir_current_remote_code == "setup":
-        bluetooth_serial_processing()
+        bluetooth_serial_processing(uart)
     elif ir_current_remote_code == "9":
         music_play()
+    elif ir_current_remote_code == "0":
+        vm_download_mode(uart)
     else:
         line_follower_simple()
