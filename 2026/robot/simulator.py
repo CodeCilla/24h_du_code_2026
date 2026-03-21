@@ -417,7 +417,7 @@ const R = {report_json};
 const steps = R.steps;
 let cur = 0;
 
-def renderList() {{
+function renderList() {{
     const el = document.getElementById('steps-list');
     el.innerHTML = steps.map((s, i) => {{
         const ops = s.ops.map(o => typeof o === 'string' ? o : o).join(' ');
