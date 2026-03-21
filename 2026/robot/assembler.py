@@ -25,35 +25,33 @@ def parse_value(token):
     return val
 
 def first_pass(lines):
-    """Premier passage : collecter les labels et leurs adresses"""
+    """Premier passage : collecter les labels et leurs adresses.
+    Les DB sont toujours placés après le RET dans le binaire final.
+    """
     labels = {}
+    # Passe 1a : adresses des instructions (sans DB, sans RET)
     address = 0
     for line in lines:
         line = line.strip()
-        # Supprimer commentaires
         if ';' in line:
             line = line[:line.index(';')].strip()
         if not line:
             continue
-        # Label seul sur sa ligne
         if line.endswith(':'):
             label = line[:-1].strip()
             labels[label] = address
             continue
-        # Calculer la taille de l'instruction
         tokens = line.split()
         instr = tokens[0].upper()
-        if instr == 'DB':
-            address += 1
-        elif instr in ('RET',):
-            address += 1
+        if instr in ('DB', 'RET'):
+            pass  # traités séparément
         elif instr in ('PUSH', 'POP', 'OUT'):
             address += 1
         elif instr in ('MOV', 'SUB', 'CMP'):
             if len(tokens) >= 3 and tokens[1].upper() in REGISTERS and tokens[2].upper() in REGISTERS:
-                address += 1  # Rx Ry -> 1 octet
+                address += 1
             else:
-                address += 2  # Rx valeur -> 2 octets
+                address += 2
         elif instr in ('CALL', 'JMP', 'JLT', 'JEQ'):
             address += 2
         elif instr in ('LDR', 'STR'):
@@ -62,11 +60,10 @@ def first_pass(lines):
             address += 2
         else:
             raise ValueError(f"Instruction inconnue: {instr}")
-    return labels
 
-def second_pass(lines, labels):
-    """Deuxième passage : générer le binaire"""
-    binary = []
+    # Passe 1b : labels devant des DB → adresses après le RET
+    db_address = address + 1  # +1 pour le RET implicite
+    db_label_pending = None
     for line in lines:
         line = line.strip()
         if ';' in line:
@@ -74,125 +71,133 @@ def second_pass(lines, labels):
         if not line:
             continue
         if line.endswith(':'):
-            continue  # Label, pas d'instruction
+            db_label_pending = line[:-1].strip()
+            continue
+        tokens = line.split()
+        instr = tokens[0].upper()
+        if instr == 'DB':
+            if db_label_pending:
+                labels[db_label_pending] = db_address
+                db_label_pending = None
+            db_address += 1
+        else:
+            db_label_pending = None
+
+    return labels
+
+
+def second_pass(lines, labels):
+    """Deuxième passage : générer le binaire.
+    Ordre de sortie : [instructions] + RET (0x80) + [données DB]
+    Peu importe l'ordre dans le .asm source.
+    """
+    code = []
+    db_bytes = []
+
+    for line in lines:
+        line = line.strip()
+        if ';' in line:
+            line = line[:line.index(';')].strip()
+        if not line:
+            continue
+        if line.endswith(':'):
+            continue
 
         tokens = line.split()
         instr = tokens[0].upper()
 
         if instr == 'DB':
-            binary.append(parse_value(tokens[1]))
+            db_bytes.append(parse_value(tokens[1]))
 
         elif instr == 'RET':
-            # 10000000
-            binary.append(0b10000000)
+            pass  # RET implicite ajouté à la fin
 
         elif instr == 'PUSH':
-            # 101000xx
             rx = REGISTERS[tokens[1].upper()]
-            binary.append(0b10100000 | rx)
+            code.append(0b10100000 | rx)
 
         elif instr == 'POP':
-            # 011000xx
             rx = REGISTERS[tokens[1].upper()]
-            binary.append(0b01100000 | rx)
+            code.append(0b01100000 | rx)
 
         elif instr == 'OUT':
-            # 111100xx
             rx = REGISTERS[tokens[1].upper()]
-            binary.append(0b11110000 | rx)
+            code.append(0b11110000 | rx)
 
         elif instr == 'MOV':
             rx = tokens[1].upper()
             ry_or_val = tokens[2].upper()
             if ry_or_val in REGISTERS:
-                # MOV Rx Ry -> 0101xxyy
-                binary.append(0b01010000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
+                code.append(0b01010000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
             else:
-                # MOV Rx valeur -> 111000xx vvvvvvvv
                 val = parse_value(tokens[2])
-                binary.append(0b11100000 | REGISTERS[rx])
-                binary.append(val)
+                code.append(0b11100000 | REGISTERS[rx])
+                code.append(val)
 
         elif instr == 'SUB':
             rx = tokens[1].upper()
             ry_or_val = tokens[2].upper()
             if ry_or_val in REGISTERS:
-                # SUB Rx Ry -> 1101xxyy
-                binary.append(0b11010000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
+                code.append(0b11010000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
             else:
-                # SUB Rx valeur -> 000100xx vvvvvvvv
                 val = parse_value(tokens[2])
-                binary.append(0b00010000 | REGISTERS[rx])
-                binary.append(val)
+                code.append(0b00010000 | REGISTERS[rx])
+                code.append(val)
 
         elif instr == 'CMP':
             rx = tokens[1].upper()
             ry_or_val = tokens[2].upper()
             if ry_or_val in REGISTERS:
-                # CMP Rx Ry -> 0011xxyy
-                binary.append(0b00110000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
+                code.append(0b00110000 | (REGISTERS[rx] << 2) | REGISTERS[ry_or_val])
             else:
-                # CMP Rx valeur -> 100100xx vvvvvvvv
                 val = parse_value(tokens[2])
-                binary.append(0b10010000 | REGISTERS[rx])
-                binary.append(val)
+                code.append(0b10010000 | REGISTERS[rx])
+                code.append(val)
 
         elif instr == 'CALL':
-            # 00000000 aaaaaaaa
-            label = tokens[1]
-            addr = labels[label]
-            binary.append(0b00000000)
-            binary.append(addr)
+            addr = labels[tokens[1]]
+            code.append(0b00000000)
+            code.append(addr)
 
         elif instr == 'JMP':
-            # 01000000 aaaaaaaa
-            label = tokens[1]
-            addr = labels[label]
-            binary.append(0b01000000)
-            binary.append(addr)
+            addr = labels[tokens[1]]
+            code.append(0b01000000)
+            code.append(addr)
 
         elif instr == 'JLT':
-            # 11000000 aaaaaaaa
-            label = tokens[1]
-            addr = labels[label]
-            binary.append(0b11000000)
-            binary.append(addr)
+            addr = labels[tokens[1]]
+            code.append(0b11000000)
+            code.append(addr)
 
         elif instr == 'JEQ':
-            # 00100000 aaaaaaaa
-            label = tokens[1]
-            addr = labels[label]
-            binary.append(0b00100000)
-            binary.append(addr)
+            addr = labels[tokens[1]]
+            code.append(0b00100000)
+            code.append(addr)
 
         elif instr == 'LDR':
-            # 1011xxyy aaaaaaaa
             rx = REGISTERS[tokens[1].upper()]
             ry = REGISTERS[tokens[2].upper()]
-            label = tokens[3]
-            addr = labels[label]
-            binary.append(0b10110000 | (rx << 2) | ry)
-            binary.append(addr)
+            addr = labels[tokens[3]]
+            code.append(0b10110000 | (rx << 2) | ry)
+            code.append(addr)
 
         elif instr == 'STR':
-            # 0111xxyy aaaaaaaa
             rx = REGISTERS[tokens[1].upper()]
             ry = REGISTERS[tokens[2].upper()]
-            label = tokens[3]
-            addr = labels[label]
-            binary.append(0b01110000 | (rx << 2) | ry)
-            binary.append(addr)
+            addr = labels[tokens[3]]
+            code.append(0b01110000 | (rx << 2) | ry)
+            code.append(addr)
 
         elif instr == 'TIM':
-            # 11111000 mvvvvvvv
             val = parse_value(tokens[1])
-            binary.append(0b11111000)
-            binary.append(val)
+            code.append(0b11111000)
+            code.append(val)
 
         else:
             raise ValueError(f"Instruction inconnue: {instr}")
 
-    return bytes(binary)
+    return bytes(code + [0x80] + db_bytes)
+
 
 def assemble(input_path, output_path):
     with open(input_path, 'r', encoding='utf-8') as f:

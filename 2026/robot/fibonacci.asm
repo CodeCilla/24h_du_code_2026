@@ -1,71 +1,71 @@
-; Fibonacci — affiche tous les nombres de Fib entre 0 et 255
-; R0 = a (terme courant)  R1 = b (terme suivant)  R2 = temp
+; ============================================================================
+; FIBONACCI OPTIMISÉ - Affiche tous les termes de Fibonacci de 0 à 255
+; ============================================================================
+;
+; PRINCIPE DE L'OPTIMISATION :
+; ---------------------------
+; Problème du code original : L'addition était simulée par une boucle qui
+; incrémente R1, R0 fois. Pour calculer 144+89, cela faisait 89 itérations !
+; → Complexité O(n) par addition, expliquant les ~4000 cycles totaux.
+;
+; Solution mathématique (Complément à 256 sur 8 bits) :
+; ---------------------------------------------------
+; Comme il n'y a pas d'instruction ADD, on utilise la formule :
+;                    a + b = 0 - (0 - a - b)
+;
+; Explication : Sur 8 bits, les nombres négatifs sont codés ainsi :
+;   -x ≡ 256 - x (mod 256)
+;   
+; Donc :
+;   0 - b = -b (mod 256)          [ex: 0-3 = 253 qui représente -3]
+;   -b - a = -(a+b) (mod 256)     [ex: 253-5 = 248 qui représente -8]
+;   0 - (-(a+b)) = a+b (mod 256)  [ex: 0-248 = 8 qui représente +8]
+;
+; Avantages :
+;   • Addition en O(1) : toujours 4 instructions, quelles que soient les valeurs
+;   • Pas d'utilisation de la pile (PUSH/POP/CALL supprimés)
+;   • Registres uniquement : R0, R1, R2, R3
+;   • ~12 cycles par itération au lieu de 300-400
+;   • Total : ~170-180 cycles au lieu de 4000 (x23 plus rapide)
+;
+; REGISTRES UTILISÉS :
+; ------------------
+; R0 = a (terme courant, ex: 0, 1, 1, 2, 3, 5, 8...)
+; R1 = b (terme suivant, ex: 1, 1, 2, 3, 5, 8, 13...)
+; R2 = registre temporaire pour le calcul -(a+b)
+; R3 = constante 0 (optimisation pour éviter MOV Rx 0 répétés)
+;
+; DÉTECTION DE DÉPASSEMENT (Overflow 8 bits) :
+; ------------------------------------------
+; Quand a+b > 255, le résultat tronqué sur 8 bits devient < a (car overflow).
+; Ex: 233 + 144 = 377 → 377-256 = 121, et 121 < 233.
+; Donc si nouveau_b < nouveau_a, on arrête (on a dépassé 255).
+;
+; ============================================================================
 
 _main:
     MOV R0 0        ; a = 0 (premier terme)
     MOV R1 1        ; b = 1 (deuxième terme)
+    MOV R3 0        ; R3 = constante 0 (pour les calculs)
 
 _loop:
-    ; Afficher a si a <= 255 (toujours vrai sur 8 bits, mais on vérifie le dépassement)
-    OUT R0          ; afficher le terme courant a
+    OUT R0          ; afficher terme courant (1 cycle)
+    
+    ; --- Calcul de -(a+b) dans R2 en O(1) (4 instructions) ---
+    MOV R2 R3       ; R2 = 0 (1 cycle)
+    SUB R2 R1       ; R2 = 0 - b = -b (1 cycle)
+    SUB R2 R0       ; R2 = -b - a = -(a+b) (1 cycle)
+    
+    ; --- Mise à jour : a=b, b=a+b ---
+    MOV R0 R1       ; a = ancien b (1 cycle)
+    MOV R1 R3       ; R1 = 0 (1 cycle)
+    SUB R1 R2       ; b = 0 - (-(a+b)) = a+b (1 cycle)
+    
+    ; --- Vérification dépassement ---
+    CMP R1 R0       ; comparer nouveau b avec nouveau a (1 cycle)
+    JLT _done       ; si b < a : overflow détecté, c'est fini (2 cycles)
+    JMP _loop       ; sinon continuer la séquence (2 cycles)
 
-    ; temp = b
-    MOV R2 R1        ; R2 = b
-
-    ; b = a + b  →  on fait b = b + a via: b = b, puis on soustrait (-a) non dispo
-    ; Astuce : on calcule b_new = a + b en utilisant PUSH/POP et SUB
-    ; On empile b, puis on met R1 = a, on soustrait -b... SUB soustrait seulement
-    ; Stratégie propre : R1 = R1 + R0 via  R1 = R1, SUB R1 (255-R0+1) non trivial
-    ; Meilleure approche : simuler ADD avec la pile
-
-    ; R1_new = R0 + R1 : on utilise le fait que a+b = b - (-a) n'est pas direct
-    ; On calcule : R1 = R2 + R0  =>  R1 = R2, SUB R1 (256 - R0) non portable
-    ; Solution : boucle d'addition via décrémentation
-
-    ; Sauvegarder R0 et R2 sur la pile
-    PUSH R0          ; empiler a
-    PUSH R2          ; empiler b (ancien)
-
-    ; Appel de la fonction d'addition : additionne R0 + R1 → résultat dans R1
-    ; R0 = a, R1 = b  →  R1 devient a+b
-    CALL _add_r0_to_r1
-
-    ; Maintenant R1 = a + b (nouveau terme)
-    ; Restaurer a depuis la pile
-    POP R2           ; récupérer b ancien dans R2 (on ignore)
-    POP R0           ; récupérer a dans R0
-
-    ; a = ancien b = R2
-    MOV R0 R2        ; a = ancien b
-
-    ; Vérifier si le nouveau b (R1) a dépassé 255
-    ; Si R1 < R0 alors overflow (signe d'un dépassement 8 bits)
-    CMP R1 R0        ; comparer nouveau b avec a
-    JLT _print_and_end ; si b < a : on affiche `a` final puis on arrête
-
-    JMP _loop        ; continuer
-
-_print_and_end:
-    OUT R0           ; afficher le dernier terme (ex: 233)
-    RET              ; pile vide → arrêt du programme
-
-; --- Fonction : additionne R0 dans R1 (R1 += R0) ---
-; Utilise R3 comme compteur, ne modifie pas R0
-; Principe : décrémenter R3 de 1 jusqu'à 0, incrémenter R1 à chaque fois
-; (incrément = SUB R3 1, et on simule R1++ par SUB R1 255 ... pas idéal)
-; Vrai incrément : on ne peut qu'utiliser SUB, donc on simule +1 via SUB R1 255
-; car sur 8 bits : x + 1 = x - 255 (en complément à 256 = overflow)
-_add_r0_to_r1:
-    MOV R3 R0        ; R3 = compteur (= R0 itérations)
-    CMP R3 0         ; si R0 == 0, rien à faire
-    JEQ _add_done
-
-_add_loop:
-    SUB R1 255       ; R1 += 1  (sur 8 bits : -255 ≡ +1 mod 256)
-    SUB R3 1         ; décrémenter compteur
-    CMP R3 0         ; compteur == 0 ?
-    JEQ _add_done
-    JMP _add_loop
-
-_add_done:
-    RET
+_done:
+    OUT R0          ; afficher le dernier terme valide (233)
+    RET             ; fin du programme (pile vide)
