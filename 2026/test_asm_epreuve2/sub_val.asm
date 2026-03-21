@@ -1,0 +1,9 @@
+SUB R0 1
+SUB R1 255
+SUB R2 'a'
+SUB R3 'z'
+SUB R0 'B'
+SUB R1 'X'
+SUB R2 '0'
+SUB R3 '9'
+ 

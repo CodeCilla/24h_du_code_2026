@@ -1,0 +1,4 @@
+OUT R0
+OUT R1
+OUT R2
+OUT R3

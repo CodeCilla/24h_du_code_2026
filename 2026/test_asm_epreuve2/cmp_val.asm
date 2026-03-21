@@ -1,0 +1,9 @@
+CMP R0 1
+CMP R1 255
+CMP R2 'a'
+CMP R3 'z'
+CMP R0 'B'
+CMP R1 'X'
+CMP R2 '0'
+CMP R3 '9'
+ 

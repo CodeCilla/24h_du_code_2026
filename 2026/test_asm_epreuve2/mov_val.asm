@@ -1,0 +1,9 @@
+MOV R0 1
+MOV R1 255
+MOV R2 'a'
+MOV R3 'z'
+MOV R0 'B'
+MOV R1 'X'
+MOV R2 '0'
+MOV R3 '9'
+ 

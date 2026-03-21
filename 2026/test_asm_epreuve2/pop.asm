@@ -1,0 +1,4 @@
+POP R0
+POP R1
+POP R2
+POP R3
