@@ -7,14 +7,14 @@ import binascii
 import uasyncio as asyncio
 import RobotBleServer
 
-robotName = 'myTeamName'
+robotName = 'EkodEtCommit'
 
 toSend = []
 
 def onMsgToRobot(data:str|bytes):
 	"""Function to call when a message sent by PC is received
 	:param data: message received"""
-	checksum = binascii.crc32(data)
+	checksum = binascii.crc32(data.encode() if isinstance(data, str) else data)
 	print('received', data, '=>', checksum)
 	toSend.append(str(checksum))
 

@@ -13,7 +13,7 @@ import argparse
 import random
 import ComWithDongle
 
-robotName = 'myTeamName'
+robotName = 'EkodEtCommit'
 
 randCharRange = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -58,7 +58,7 @@ try:
 		else:
 			data = ''.join([random.choice(randCharRange) for _ in range(args.length)])
 		print('send data', len(data), msgId, data, flush=True)
-		checksum = binascii.crc32(data)
+		checksum = binascii.crc32(data.encode() if isinstance(data, str) else data)
 		expectedToReceive.append(str(checksum))
 		com.sendMsg(data)
 		print('+not received yet', len(expectedToReceive), expectedToReceive, flush=True)

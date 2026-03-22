@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 drive=$1
 if [[($drive == "")]]; then
