@@ -6,7 +6,7 @@ if [[($drive == "")]]; then
   exit 1
 fi
 
-cp -r aioble $drive/
-cp RobotBleServer.py $drive
-cp mainRobotTestBLE.py $drive/main.py
+cp -r aioble "$drive/"
+cp RobotBleServer.py "$drive"
+cp mainRobotTestBLE.py "$drive/main.py"
 sync
